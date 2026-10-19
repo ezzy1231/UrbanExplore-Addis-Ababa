@@ -1,15 +1,17 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { BadgeCheck, MapPin, Store, UtensilsCrossed } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import {
   ConsolePageShell,
   ConsoleHeader,
   SectionTitle,
   StatusPill,
-  ConsoleKpiCard,
 } from '@/components/dashboard/console'
 import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { AdminBackLink } from '@/components/dashboard/admin-back-link'
+import { AdminKpiCard } from '@/components/dashboard/admin-kpi-card'
 import { BusinessLifecycleActions, BusinessSuspendAction } from '@/components/dashboard/admin-actions'
 import { cn } from '@/lib/utils'
 
@@ -80,19 +82,14 @@ export default async function AdminBusinessDetailPage({
   }>
 
   const kpis = [
-    { label: 'Listings', value: String(restaurants.length), accent: true },
-    { label: 'Branches', value: String(branches.length), accent: false },
-    { label: 'Menu items', value: String(menuCountRes.count ?? 0), accent: false },
+    { label: 'Listings', value: String(restaurants.length), icon: Store, tone: 'indigo' as const },
+    { label: 'Branches', value: String(branches.length), icon: MapPin, tone: 'sky' as const },
+    { label: 'Menu items', value: String(menuCountRes.count ?? 0), icon: UtensilsCrossed, tone: 'mint' as const },
   ]
 
   return (
     <ConsolePageShell>
-      <Link
-        href="/dashboard/admin/businesses"
-        className="text-xs font-semibold uppercase tracking-widest text-app-muted transition-colors hover:text-ember"
-      >
-        ← Back to businesses
-      </Link>
+      <AdminBackLink href="/dashboard/admin/businesses">Back to businesses</AdminBackLink>
 
       <ConsoleHeader
         eyebrow="Partner console · admin view"
@@ -107,26 +104,26 @@ export default async function AdminBusinessDetailPage({
 
       <section
         className={cn(
-          'flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm',
-          b.status === 'pending'
-            ? 'border-ember/40 bg-ember/10'
-            : 'border-app-border bg-app-card/70'
+          CONSOLE_CARD,
+          'flex flex-wrap items-center gap-3 p-4 text-sm',
+          b.status === 'pending' && 'border-console-indigo/25 bg-console-indigo-soft/50',
         )}
       >
         <StatusPill status={b.status} tone={statusTone(b.status)} />
         {b.is_verified && (
-          <span className="rounded-full bg-success/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-success">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-success/15 px-2.5 py-1 text-[11px] font-bold text-success">
+            <BadgeCheck aria-hidden="true" className="size-3.5" strokeWidth={2.3} />
             Verified
           </span>
         )}
-        <span className="capitalize text-app-muted">Plan: {b.plan ?? 'free'}</span>
-        {b.category && <span className="capitalize text-app-muted">{b.category}</span>}
+        <span className="capitalize text-console-muted">Plan: {b.plan ?? 'free'}</span>
+        {b.category && <span className="capitalize text-console-muted">{b.category}</span>}
       </section>
 
       {/* Contact + meta */}
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className={cn(CONSOLE_SURFACE, 'space-y-2 p-5 text-sm')}>
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-app-muted">
+        <div className={cn(CONSOLE_CARD, 'space-y-2 p-5 text-sm')}>
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-console-muted">
             Contact
           </h2>
           <p>{b.email ?? 'No email on file'}</p>
@@ -147,11 +144,11 @@ export default async function AdminBusinessDetailPage({
             </a>
           )}
         </div>
-        <div className={cn(CONSOLE_SURFACE, 'space-y-2 p-5 text-sm')}>
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-app-muted">
+        <div className={cn(CONSOLE_CARD, 'space-y-2 p-5 text-sm')}>
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-console-muted">
             About
           </h2>
-          <p className="leading-relaxed text-app-muted">
+          <p className="leading-relaxed text-console-muted">
             {b.description ?? 'No editorial description provided yet.'}
           </p>
           {b.created_at && (
@@ -165,7 +162,7 @@ export default async function AdminBusinessDetailPage({
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {kpis.map((kpi) => (
-          <ConsoleKpiCard key={kpi.label} label={kpi.label} value={kpi.value} accent={kpi.accent} />
+          <AdminKpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} tone={kpi.tone} />
         ))}
       </section>
 
@@ -180,7 +177,7 @@ export default async function AdminBusinessDetailPage({
         ) : (
           <div className="space-y-2">
             {restaurants.map((r) => (
-              <div key={r.id} className={cn(CONSOLE_SURFACE, 'flex items-center justify-between p-4')}>
+              <div key={r.id} className={cn(CONSOLE_CARD, 'flex items-center justify-between p-4')}>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{r.name}</p>
                   <p className="text-xs capitalize text-app-muted">
@@ -209,10 +206,10 @@ export default async function AdminBusinessDetailPage({
         ) : (
           <div className="space-y-2">
             {branches.map((br) => (
-              <div key={br.id} className={cn(CONSOLE_SURFACE, 'flex items-center justify-between p-4')}>
+              <div key={br.id} className={cn(CONSOLE_CARD, 'flex items-center justify-between p-4')}>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{br.branch_name}</p>
-                  <p className="truncate text-xs text-app-muted">{br.address ?? '—'}</p>
+                  <p className="truncate text-xs text-console-muted">{br.address ?? '—'}</p>
                 </div>
               </div>
             ))}

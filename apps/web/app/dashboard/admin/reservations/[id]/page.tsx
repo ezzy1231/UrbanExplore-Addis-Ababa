@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import {
@@ -7,7 +6,9 @@ import {
   ConsoleHeader,
   StatusPill,
 } from '@/components/dashboard/console'
-import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { statusTone } from '@/components/dashboard/console-shared'
+import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { AdminBackLink } from '@/components/dashboard/admin-back-link'
 import { ReservationCancelAction } from '@/components/dashboard/admin-actions'
 import { cn } from '@/lib/utils'
 
@@ -59,12 +60,7 @@ export default async function AdminReservationDetailPage({
 
   return (
     <ConsolePageShell maxWidth="max-w-3xl">
-      <Link
-        href="/dashboard/admin/reservations"
-        className="text-xs font-semibold uppercase tracking-widest text-app-muted transition-colors hover:text-ember"
-      >
-        ← Back to reservations
-      </Link>
+      <AdminBackLink href="/dashboard/admin/reservations">Back to reservations</AdminBackLink>
 
       <ConsoleHeader
         eyebrow="Reservation · admin view"
@@ -73,15 +69,15 @@ export default async function AdminReservationDetailPage({
         action={<StatusPill status={r.status} tone={statusTone(r.status)} />}
       />
 
-      <section className={cn(CONSOLE_SURFACE, 'space-y-3 p-5 text-sm')}>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-app-muted">Venue</span>
+      <section className={cn(CONSOLE_CARD, 'divide-y divide-console-border text-sm')}>
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+          <span className="text-console-muted">Venue</span>
           <span className="truncate text-right font-semibold">
             {[businessName, branch?.branch_name].filter(Boolean).join(' · ') || '—'}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-app-muted">Date</span>
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+          <span className="text-console-muted">Date</span>
           <span className="tabular-nums">
             {new Date(`${r.reservation_date}T00:00:00`).toLocaleDateString('en-GB', {
               weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
@@ -89,27 +85,30 @@ export default async function AdminReservationDetailPage({
           </span>
         </div>
         {r.time_slot && (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-app-muted">Slot</span>
+          <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+            <span className="text-console-muted">Slot</span>
             <span className="tabular-nums">{r.time_slot}</span>
           </div>
         )}
         {r.created_at && (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-app-muted">Booked</span>
-            <span className="tabular-nums text-app-muted">
+          <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+            <span className="text-console-muted">Booked</span>
+            <span className="tabular-nums text-console-muted">
               {new Date(r.created_at).toLocaleString('en-GB', {
                 day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
               })}
             </span>
           </div>
         )}
-        <div className="border-t border-app-border pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <p className="text-xs text-console-muted">
+            Cancelling a booking is recorded in the audit log.
+          </p>
           <ReservationCancelAction reservationId={r.id} status={r.status} />
         </div>
       </section>
 
-      <p className="px-1 text-xs tabular-nums text-app-muted">Ref {r.id}</p>
+      <p className="px-1 text-xs tabular-nums text-console-muted">Ref {r.id}</p>
     </ConsolePageShell>
   )
 }

@@ -1,15 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Banknote, EyeOff, Ticket, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import {
   ConsolePageShell,
   ConsoleHeader,
   SectionTitle,
   StatusPill,
-  ConsoleKpiCard,
 } from '@/components/dashboard/console'
 import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { AdminBackLink } from '@/components/dashboard/admin-back-link'
+import { AdminKpiCard } from '@/components/dashboard/admin-kpi-card'
 import { EventModerationActions } from '@/components/dashboard/admin-actions'
 import { cn } from '@/lib/utils'
 
@@ -98,19 +101,14 @@ export default async function AdminEventDetailPage({
   }
 
   const kpis = [
-    { label: 'Tickets sold', value: String(ticketsSold), accent: true },
-    { label: 'Capacity left', value: String(remaining), accent: false },
-    { label: 'Paid revenue', value: `ETB ${revenuePaid.toLocaleString('en-US')}`, accent: false },
+    { label: 'Tickets sold', value: String(ticketsSold), icon: Ticket, tone: 'mint' as const },
+    { label: 'Capacity left', value: String(remaining), icon: Users, tone: 'sky' as const },
+    { label: 'Paid revenue', value: `ETB ${revenuePaid.toLocaleString('en-US')}`, icon: Banknote, tone: 'sand' as const },
   ]
 
   return (
     <ConsolePageShell>
-      <Link
-        href="/dashboard/admin/events"
-        className="text-xs font-semibold uppercase tracking-widest text-app-muted transition-colors hover:text-ember"
-      >
-        ← Back to events
-      </Link>
+      <AdminBackLink href="/dashboard/admin/events">Back to events</AdminBackLink>
 
       <ConsoleHeader
         eyebrow="Event · admin view"
@@ -120,18 +118,22 @@ export default async function AdminEventDetailPage({
 
       <section
         className={cn(
-          'flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm',
-          e.status === 'cancelled'
-            ? 'border-danger/40 bg-danger/10'
-            : 'border-app-border bg-app-card/70'
+          CONSOLE_CARD,
+          'flex flex-wrap items-center gap-3 p-4 text-sm',
+          e.status === 'cancelled' && 'border-danger/40 bg-danger/5',
         )}
       >
         <StatusPill status={e.status} tone={statusTone(e.status)} />
-        {!e.is_active && <span className="text-xs uppercase tracking-wide text-danger">Hidden from catalogue</span>}
+        {!e.is_active && (
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-console-bg px-2.5 py-1 text-[11px] font-bold text-console-muted">
+            <EyeOff aria-hidden="true" className="size-3.5" strokeWidth={2.3} />
+            Hidden from catalogue
+          </span>
+        )}
         {organizer && (
           <Link
             href={`/dashboard/admin/organizers/${organizer.id}`}
-            className="text-app-muted underline underline-offset-2 hover:text-ember"
+            className="text-console-muted underline underline-offset-2 hover:text-console-ink"
           >
             by {organizer.name}
           </Link>
@@ -140,25 +142,25 @@ export default async function AdminEventDetailPage({
 
       {/* Details */}
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className={cn(CONSOLE_SURFACE, 'space-y-2 p-5 text-sm')}>
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-app-muted">When &amp; where</h2>
+        <div className={cn(CONSOLE_CARD, 'space-y-2 p-5 text-sm')}>
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-console-muted">When &amp; where</h2>
           <p>Starts: {formatDateTime(e.starts_at)}</p>
-          {e.end_date_time && <p className="text-app-muted">Ends: {formatDateTime(e.end_date_time)}</p>}
-          {e.venue_name && <p className="text-app-muted">{e.venue_name}</p>}
-          {e.category && <p className="capitalize text-app-muted">{e.category}</p>}
+          {e.end_date_time && <p className="text-console-muted">Ends: {formatDateTime(e.end_date_time)}</p>}
+          {e.venue_name && <p className="text-console-muted">{e.venue_name}</p>}
+          {e.category && <p className="capitalize text-console-muted">{e.category}</p>}
           {e.price_label && (
-            <p className=" font-bold tabular-nums text-ember">{e.price_label}</p>
+            <p className="font-bold tabular-nums text-console-indigo">{e.price_label}</p>
           )}
         </div>
-        <div className={cn(CONSOLE_SURFACE, 'space-y-2 p-5 text-sm')}>
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-app-muted">About</h2>
-          <p className="leading-relaxed text-app-muted">{e.description ?? 'No description provided.'}</p>
+        <div className={cn(CONSOLE_CARD, 'space-y-2 p-5 text-sm')}>
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-console-muted">About</h2>
+          <p className="leading-relaxed text-console-muted">{e.description ?? 'No description provided.'}</p>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {kpis.map((kpi) => (
-          <ConsoleKpiCard key={kpi.label} label={kpi.label} value={kpi.value} accent={kpi.accent} />
+          <AdminKpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} tone={kpi.tone} />
         ))}
       </section>
 
@@ -178,20 +180,20 @@ export default async function AdminEventDetailPage({
                   ? Math.round(((t.total_quantity - t.remaining_quantity) / t.total_quantity) * 100)
                   : 0
               return (
-                <div key={t.id} className={cn(CONSOLE_SURFACE, 'p-4')}>
+                <div key={t.id} className={cn(CONSOLE_CARD, 'p-4')}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{t.name}</p>
-                      <p className="text-xs capitalize text-app-muted">{t.tier} tier</p>
+                      <p className="text-xs capitalize text-console-muted">{t.tier} tier</p>
                     </div>
-                    <span className="shrink-0  text-base font-bold tabular-nums text-ember">
+                    <span className="shrink-0 text-base font-bold tabular-nums text-console-indigo">
                       ETB {Number(t.price).toLocaleString('en-US')}
                     </span>
                   </div>
-                  <div aria-hidden className="mt-3 h-2 overflow-hidden rounded-full ">
-                    <div className="h-full rounded-full bg-ember" style={{ width: `${pct}%` }} />
+                  <div aria-hidden className="mt-3 h-2 overflow-hidden rounded-full bg-console-bg">
+                    <div className="h-full rounded-full bg-console-indigo" style={{ width: `${pct}%` }} />
                   </div>
-                  <p className="mt-1.5 text-xs tabular-nums text-app-muted">
+                  <p className="mt-1.5 text-xs tabular-nums text-console-muted">
                     {t.remaining_quantity} of {t.total_quantity} left ({pct}% sold)
                   </p>
                 </div>
@@ -212,8 +214,8 @@ export default async function AdminEventDetailPage({
             </div>
           ) : (
             recentPurchases.map((p) => (
-              <div key={p.id} className={cn(CONSOLE_SURFACE, 'space-y-2.5 p-4')}>
-                <p className="font-bold tabular-nums text-ember">
+              <div key={p.id} className={cn(CONSOLE_CARD, 'space-y-2.5 p-4')}>
+                <p className="font-bold tabular-nums text-console-indigo">
                   ETB {Number(p.amount ?? 0).toLocaleString('en-US')}
                 </p>
                 <p className="text-xs text-app-muted">
@@ -242,10 +244,10 @@ export default async function AdminEventDetailPage({
         </div>
 
         {/* Desktop */}
-        <div className={cn(CONSOLE_SURFACE, 'hidden overflow-x-auto md:block')}>
+        <div className={cn(CONSOLE_CARD, 'hidden overflow-x-auto md:block')}>
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-app-border text-[11px] uppercase tracking-[0.14em] text-app-muted">
+              <tr className="border-b border-console-border text-[11px] uppercase tracking-[0.14em] text-console-muted">
                 <th scope="col" className="px-4 py-3 font-semibold">Date</th>
                 <th scope="col" className="px-4 py-3 font-semibold">Qty</th>
                 <th scope="col" className="px-4 py-3 font-semibold">Amount</th>
@@ -262,12 +264,12 @@ export default async function AdminEventDetailPage({
                 </tr>
               ) : (
                 recentPurchases.map((p) => (
-                  <tr key={p.id} className="border-b border-app-border last:border-0">
-                    <td className="px-4 py-3 tabular-nums text-app-muted">
+                  <tr key={p.id} className="border-b border-console-border last:border-0">
+                    <td className="px-4 py-3 tabular-nums text-console-muted">
                       {new Date(p.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                     </td>
                     <td className="px-4 py-3 tabular-nums">{p.quantity ?? '—'}</td>
-                    <td className="px-4 py-3  font-bold tabular-nums text-ember">
+                    <td className="px-4 py-3 font-bold tabular-nums text-console-indigo">
                       ETB {Number(p.amount ?? 0).toLocaleString('en-US')}
                     </td>
                     <td className="px-4 py-3"><StatusPill status={p.payment_status} tone={statusTone(p.payment_status)} /></td>

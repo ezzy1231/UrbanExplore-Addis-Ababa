@@ -8,12 +8,15 @@ import {
   StatusPill,
 } from '@/components/dashboard/console'
 import { statusTone } from '@/components/dashboard/console-shared'
+import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { AdminBackLink } from '@/components/dashboard/admin-back-link'
 import {
   getVerificationRequest,
   signVerificationDocuments,
   type VerificationDocument,
 } from '@/lib/dashboard/verification-data'
 import VerificationReviewActions from '@/components/dashboard/verification-review-actions'
+import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Review request · Admin' }
 
@@ -66,12 +69,7 @@ export default async function AdminVerificationReviewPage({
 
   return (
     <ConsolePageShell>
-      <Link
-        href="/dashboard/admin/verification"
-        className="text-xs font-semibold uppercase tracking-widest text-console-muted transition-colors hover:text-ember"
-      >
-        ← Back to queue
-      </Link>
+      <AdminBackLink href="/dashboard/admin/verification">Back to queue</AdminBackLink>
 
       <ConsoleHeader
         eyebrow="Verification"
@@ -98,7 +96,7 @@ export default async function AdminVerificationReviewPage({
         </span>
       </div>
 
-      <section className="glass rounded-2xl p-6">
+      <section className={cn(CONSOLE_CARD, 'p-6')}>
         <h2 className="text-base font-bold text-console-ink">Claimed details</h2>
         <p className="mt-1 text-sm text-console-muted">
           Snapshotted when the partner submitted. Later profile edits do not change this.
@@ -121,7 +119,7 @@ export default async function AdminVerificationReviewPage({
         </dl>
       </section>
 
-      <section className="glass rounded-2xl p-6">
+      <section className={cn(CONSOLE_CARD, 'p-6')}>
         <h2 className="text-base font-bold text-console-ink">Documents</h2>
         {request.documents.length === 0 ? (
           <p className="mt-2 text-sm text-console-muted">
@@ -134,7 +132,7 @@ export default async function AdminVerificationReviewPage({
               return (
                 <li
                   key={doc.path}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-console-border px-4 py-3"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-console-border bg-console-bg/60 px-4 py-3"
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-console-ink">
@@ -170,7 +168,7 @@ export default async function AdminVerificationReviewPage({
       </section>
 
       {request.reviewer_note && (
-        <section className="glass rounded-2xl p-6">
+        <section className={cn(CONSOLE_CARD, 'p-6')}>
           <h2 className="text-base font-bold text-console-ink">Reviewer note</h2>
           <p className="mt-2 text-sm text-console-ink">{request.reviewer_note}</p>
           {request.decided_at && (
@@ -184,7 +182,7 @@ export default async function AdminVerificationReviewPage({
         </section>
       )}
 
-      <section className="glass rounded-2xl p-6">
+      <section className={cn(CONSOLE_CARD, 'p-6')}>
         <h2 className="mb-4 text-base font-bold text-console-ink">Decision</h2>
         <VerificationReviewActions
           requestId={request.id}

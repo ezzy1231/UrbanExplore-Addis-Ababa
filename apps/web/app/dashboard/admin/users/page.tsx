@@ -2,14 +2,22 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ConsolePageShell, ConsoleHeader, FilterChip, StatusPill } from '@/components/dashboard/console'
-import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { statusTone } from '@/components/dashboard/console-shared'
 import { AdminTable } from '@/components/dashboard/admin-table'
+import { AdminSearchBar } from '@/components/dashboard/admin-search'
 import { UserRoleSelect, UserSuspensionActions } from '@/components/dashboard/admin-actions'
-import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Users · Admin' }
 
 const ROLE_FILTERS = ['all', 'customer', 'food_business', 'event_organizer', 'system_admin'] as const
+
+const ROLE_LABEL: Record<(typeof ROLE_FILTERS)[number], string> = {
+  all: 'All roles',
+  customer: 'Customers',
+  food_business: 'Businesses',
+  event_organizer: 'Organizers',
+  system_admin: 'Admins',
+}
 
 export default async function AdminUsersPage({
   searchParams,
@@ -41,14 +49,15 @@ export default async function AdminUsersPage({
     <ConsolePageShell maxWidth="max-w-7xl">
       <ConsoleHeader eyebrow="Admin console" title="Users" subtitle="Roles, suspension, and account search. Role changes are recorded in the audit log." />
       <div className="space-y-3">
-        <form method="get" className={cn(CONSOLE_SURFACE, 'flex items-center gap-3 px-3 py-2')}>
-          <label htmlFor="user-search" className="sr-only">Search by name or email</label>
-          <input id="user-search" type="search" name="q" defaultValue={q} placeholder="Search by name or email…" className="min-h-10 w-full bg-transparent text-sm text-app-fg outline-none placeholder:text-app-muted" />
-          {roleFilter !== 'all' && <input type="hidden" name="role" value={roleFilter} />}
-          <button className="min-h-10 rounded-lg bg-ember px-4 text-xs font-semibold text-on-accent">Search</button>
-        </form>
+        <AdminSearchBar
+          id="user-search"
+          label="Search by name or email"
+          placeholder="Search by name or email…"
+          defaultValue={q}
+          hiddenFields={{ role: roleFilter === 'all' ? undefined : roleFilter }}
+        />
         <div className="flex flex-wrap gap-2">
-          {ROLE_FILTERS.map((role) => <FilterChip key={role} href={`/dashboard/admin/users?role=${role}${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={roleFilter === role}>{role}</FilterChip>)}
+          {ROLE_FILTERS.map((role) => <FilterChip key={role} href={`/dashboard/admin/users?role=${role}${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={roleFilter === role}>{ROLE_LABEL[role]}</FilterChip>)}
         </div>
       </div>
       <AdminTable
@@ -65,7 +74,7 @@ export default async function AdminUsersPage({
         rows={rows.map((row) => {
           const isSelf = row.id === user.id
           return { key: row.id, cells: [
-            <span key="user" className="inline-flex items-center gap-2 font-medium">{row.full_name ?? '—'}{isSelf && <span className="rounded bg-ember/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-ember">You</span>}</span>,
+            <span key="user" className="inline-flex items-center gap-2 font-medium">{row.full_name ?? '—'}{isSelf && <span className="rounded-md bg-console-indigo-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-console-indigo">You</span>}</span>,
             <span key="email" className="text-app-muted">{row.email ?? '—'}</span>,
             isSelf ? <StatusPill key="role" status={row.role} tone={statusTone(row.role)} /> : <UserRoleSelect key="role" userId={row.id} currentRole={row.role} />,
             <StatusPill key="status" status={row.is_suspended ? 'suspended' : 'active'} tone={row.is_suspended ? 'bad' : 'ok'} />,

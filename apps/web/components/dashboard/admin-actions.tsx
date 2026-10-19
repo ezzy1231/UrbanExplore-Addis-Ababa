@@ -2,7 +2,18 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import {
+  BadgeCheck,
+  Ban,
+  Check,
+  ChevronDown,
+  EyeOff,
+  Loader2,
+  RotateCcw,
+  Send,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import {
   adminCancelReservation,
   adminModerateEvent,
@@ -23,14 +34,20 @@ import { toast } from './console-toast'
  * the toast title so a decision is never silent.
  */
 
-const pill =
-  'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50'
-const pillOk = `${pill} border-success/40 bg-success/15 text-success hover:bg-success/25`
-const pillBad = `${pill} border-danger/40 bg-danger/15 text-danger hover:bg-danger/25`
-const pillNeutral = `${pill} border-console-border bg-console-card text-console-muted hover:border-console-indigo/30 hover:text-console-ink`
+const chip =
+  'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:opacity-50'
+const chipOk = `${chip} border-success/40 bg-success/15 text-success hover:bg-success/25`
+const chipBad = `${chip} border-danger/40 bg-danger/15 text-danger hover:bg-danger/25`
+const chipNeutral = `${chip} border-console-border bg-console-card text-console-muted hover:border-console-indigo/30 hover:text-console-ink`
 
 function Busy() {
   return <Loader2 aria-hidden="true" className="size-3.5 animate-spin" strokeWidth={2.4} />
+}
+
+/** Semantic icon while idle, spinner while the action is in flight. */
+function ActionIcon({ pending, icon: Icon }: { pending: boolean; icon: LucideIcon }) {
+  if (pending) return <Busy />
+  return <Icon aria-hidden="true" className="size-3.5" strokeWidth={2.3} />
 }
 
 function reportFailure(message: string, fallback = 'Please try again.') {
@@ -64,20 +81,20 @@ export function BusinessLifecycleActions({
   return (
     <div className="flex items-center gap-2">
       {status === 'pending' && (
-        <button type="button" disabled={pending} onClick={() => run(true)} className={pillOk}>
-          {pending && <Busy />}
+        <button type="button" disabled={pending} onClick={() => run(true)} className={chipOk}>
+          <ActionIcon pending={pending} icon={BadgeCheck} />
           {pending ? 'Verifying…' : 'Verify'}
         </button>
       )}
       {status === 'rejected' && (
-        <button type="button" disabled={pending} onClick={() => run(true)} className={pillOk}>
-          {pending && <Busy />}
+        <button type="button" disabled={pending} onClick={() => run(true)} className={chipOk}>
+          <ActionIcon pending={pending} icon={Check} />
           {pending ? 'Approving…' : 'Approve & activate'}
         </button>
       )}
       {(status === 'active' || status === 'pending') && (
-        <button type="button" disabled={pending} onClick={() => run(false)} className={pillBad}>
-          {pending && <Busy />}
+        <button type="button" disabled={pending} onClick={() => run(false)} className={chipBad}>
+          <ActionIcon pending={pending} icon={X} />
           Reject
         </button>
       )}
@@ -112,11 +129,12 @@ export function OrganizerVerificationActions({
     <div className="flex items-center gap-2">
       {(status === 'pending' || status === 'rejected') && (
         <>
-          <button type="button" disabled={pending} onClick={() => act(true)} className={pillOk}>
-            {pending && <Busy />}
+          <button type="button" disabled={pending} onClick={() => act(true)} className={chipOk}>
+            <ActionIcon pending={pending} icon={BadgeCheck} />
             {pending ? 'Verifying…' : 'Verify'}
           </button>
-          <button type="button" disabled={pending} onClick={() => act(false)} className={pillBad}>
+          <button type="button" disabled={pending} onClick={() => act(false)} className={chipBad}>
+            <ActionIcon pending={pending} icon={X} />
             Reject
           </button>
         </>
@@ -124,6 +142,13 @@ export function OrganizerVerificationActions({
     </div>
   )
 }
+
+const ROLE_OPTIONS = [
+  { value: 'customer', label: 'Customer' },
+  { value: 'food_business', label: 'Food business' },
+  { value: 'event_organizer', label: 'Event organizer' },
+  { value: 'system_admin', label: 'System admin' },
+]
 
 export function UserRoleSelect({ userId, currentRole }: { userId: string; currentRole: string }) {
   const router = useRouter()
@@ -144,18 +169,26 @@ export function UserRoleSelect({ userId, currentRole }: { userId: string; curren
 
   return (
     <span className="inline-flex items-center gap-2">
-      <select
-        value={currentRole}
-        disabled={pending}
-        onChange={(event) => change(event.target.value)}
-        aria-label="User role"
-        className="rounded-lg border border-console-border bg-console-card px-2 py-1.5 text-xs text-console-ink outline-none transition-colors focus:border-console-indigo/50 disabled:opacity-50"
-      >
-        <option value="customer">customer</option>
-        <option value="food_business">food_business</option>
-        <option value="event_organizer">event_organizer</option>
-        <option value="system_admin">system_admin</option>
-      </select>
+      <span className="relative inline-flex items-center">
+        <select
+          value={currentRole}
+          disabled={pending}
+          onChange={(event) => change(event.target.value)}
+          aria-label="User role"
+          className="h-9 appearance-none rounded-lg border border-console-border bg-console-card pl-3 pr-8 text-xs font-semibold text-console-ink transition-colors hover:border-console-indigo/30 focus:border-console-indigo/50 disabled:opacity-50"
+        >
+          {ROLE_OPTIONS.map((role) => (
+            <option key={role.value} value={role.value}>
+              {role.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 size-3.5 text-console-muted"
+          strokeWidth={2.3}
+        />
+      </span>
       {pending && <Busy />}
     </span>
   )
@@ -187,19 +220,20 @@ export function EventModerationActions({
   return (
     <div className="flex items-center justify-end gap-2">
       {(status === 'draft' || status === 'cancelled') && (
-        <button type="button" disabled={pending} onClick={() => act('publish')} className={pillOk}>
-          {pending && <Busy />}
+        <button type="button" disabled={pending} onClick={() => act('publish')} className={chipOk}>
+          <ActionIcon pending={pending} icon={Send} />
           {pending ? 'Publishing…' : 'Publish'}
         </button>
       )}
       {status === 'published' && (
-        <button type="button" disabled={pending} onClick={() => act('unpublish')} className={pillNeutral}>
-          {pending && <Busy />}
+        <button type="button" disabled={pending} onClick={() => act('unpublish')} className={chipNeutral}>
+          <ActionIcon pending={pending} icon={EyeOff} />
           {pending ? 'Unpublishing…' : 'Unpublish'}
         </button>
       )}
       {(status === 'published' || status === 'draft') && (
-        <button type="button" disabled={pending} onClick={() => act('cancel')} className={pillBad}>
+        <button type="button" disabled={pending} onClick={() => act('cancel')} className={chipBad}>
+          <ActionIcon pending={pending} icon={X} />
           Cancel
         </button>
       )}
@@ -235,8 +269,8 @@ export function ReservationCancelAction({
   if (done || (status !== 'pending' && status !== 'confirmed')) return null
 
   return (
-    <button type="button" disabled={pending} onClick={cancel} className={pillBad}>
-      {pending && <Busy />}
+    <button type="button" disabled={pending} onClick={cancel} className={chipBad}>
+      <ActionIcon pending={pending} icon={X} />
       {pending ? 'Cancelling…' : 'Cancel booking'}
     </button>
   )
@@ -267,8 +301,8 @@ export function UserSuspensionActions({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" disabled={pending} onClick={toggle} className={isSuspended ? pillOk : pillBad}>
-        {pending && <Busy />}
+      <button type="button" disabled={pending} onClick={toggle} className={isSuspended ? chipOk : chipBad}>
+        <ActionIcon pending={pending} icon={isSuspended ? RotateCcw : Ban} />
         {isSuspended ? (pending ? 'Reinstating…' : 'Reinstate') : pending ? 'Suspending…' : 'Suspend'}
       </button>
     </span>
@@ -303,8 +337,8 @@ export function BusinessSuspendAction({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" disabled={pending} onClick={toggle} className={suspended ? pillOk : pillNeutral}>
-        {pending && <Busy />}
+      <button type="button" disabled={pending} onClick={toggle} className={suspended ? chipOk : chipNeutral}>
+        <ActionIcon pending={pending} icon={suspended ? RotateCcw : Ban} />
         {suspended ? (pending ? 'Reactivating…' : 'Reactivate') : pending ? 'Suspending…' : 'Suspend'}
       </button>
     </span>

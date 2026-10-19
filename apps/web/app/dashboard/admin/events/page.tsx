@@ -2,10 +2,10 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ConsolePageShell, ConsoleHeader, FilterChip, StatusPill } from '@/components/dashboard/console'
-import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { statusTone } from '@/components/dashboard/console-shared'
+import { AdminSearchBar } from '@/components/dashboard/admin-search'
 import { AdminTable } from '@/components/dashboard/admin-table'
 import { EventModerationActions } from '@/components/dashboard/admin-actions'
-import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Events · Admin' }
 const STATUS_FILTERS = ['all', 'published', 'draft', 'cancelled', 'completed'] as const
@@ -42,12 +42,13 @@ export default async function AdminEventsPage({
     <ConsolePageShell maxWidth="max-w-7xl">
       <ConsoleHeader eyebrow="Admin console" title="Events" subtitle="Moderate what appears on the public events catalogue." />
       <div className="space-y-3">
-        <form method="get" className={cn(CONSOLE_SURFACE, 'flex items-center gap-3 px-3 py-2')}>
-          <label htmlFor="event-search" className="sr-only">Search events</label>
-          <input id="event-search" type="search" name="q" defaultValue={q} placeholder="Search events…" className="min-h-10 w-full bg-transparent text-sm text-app-fg outline-none placeholder:text-app-muted" />
-          {statusFilter !== 'all' && <input type="hidden" name="status" value={statusFilter} />}
-          <button className="min-h-10 rounded-lg bg-ember px-4 text-xs font-semibold text-on-accent">Search</button>
-        </form>
+        <AdminSearchBar
+          id="event-search"
+          label="Search events"
+          placeholder="Search events…"
+          defaultValue={q}
+          hiddenFields={{ status: statusFilter === 'all' ? undefined : statusFilter }}
+        />
         <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map((status) => <FilterChip key={status} href={`/dashboard/admin/events?status=${status}${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={statusFilter === status}>{status}</FilterChip>)}
         </div>

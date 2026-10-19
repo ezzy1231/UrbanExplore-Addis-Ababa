@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { BadgeCheck, Minus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import {
   ConsolePageShell,
@@ -7,10 +8,10 @@ import {
   FilterChip,
   StatusPill,
 } from '@/components/dashboard/console'
-import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { statusTone } from '@/components/dashboard/console-shared'
+import { AdminSearchBar } from '@/components/dashboard/admin-search'
 import { BusinessLifecycleActions, BusinessSuspendAction } from '@/components/dashboard/admin-actions'
 import { AdminTable } from '@/components/dashboard/admin-table'
-import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Businesses · Admin' }
 
@@ -61,21 +62,13 @@ export default async function AdminBusinessesPage({
       />
 
       <div className="flex flex-col gap-3">
-        <form method="get" className={cn(CONSOLE_SURFACE, 'flex items-center gap-3 px-4 py-3')}>
-          <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-app-muted">
-            <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
-          </svg>
-          <label htmlFor="directory-search" className="sr-only">Search businesses</label>
-          <input
-            id="directory-search"
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="Search businesses…"
-            className="w-full bg-transparent text-sm text-app-fg outline-none placeholder:text-app-muted"
-          />
-          {statusFilter !== 'all' && <input type="hidden" name="status" value={statusFilter} />}
-        </form>
+        <AdminSearchBar
+          id="business-search"
+          label="Search businesses"
+          placeholder="Search businesses…"
+          defaultValue={q}
+          hiddenFields={{ status: statusFilter === 'all' ? undefined : statusFilter }}
+        />
         <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map((s) => (
             <FilterChip
@@ -104,7 +97,18 @@ export default async function AdminBusinessesPage({
           <Link key="business" href={`/dashboard/admin/businesses/${row.id}`} className="font-semibold underline-offset-2 hover:underline">{row.name}</Link>,
           <span key="plan" className="capitalize text-app-muted">{row.plan ?? 'free'}</span>,
           <StatusPill key="status" status={row.status} tone={statusTone(row.status)} />,
-          <span key="verified" aria-label={row.is_verified ? 'Verified' : 'Not verified'}>{row.is_verified ? '✓' : '—'}</span>,
+          <span
+            key="verified"
+            role="img"
+            aria-label={row.is_verified ? 'Verified' : 'Not verified'}
+            className="inline-flex items-center"
+          >
+            {row.is_verified ? (
+              <BadgeCheck aria-hidden="true" className="size-4 text-success" strokeWidth={2.2} />
+            ) : (
+              <Minus aria-hidden="true" className="size-4 text-console-muted/60" strokeWidth={2.4} />
+            )}
+          </span>,
           <span key="created_at" className="whitespace-nowrap tabular-nums text-app-muted">{new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>,
           <div key="actions" className="flex flex-wrap justify-end gap-2"><BusinessLifecycleActions businessId={row.id} status={row.status} /><BusinessSuspendAction businessId={row.id} status={row.status} /></div>,
         ] }))}

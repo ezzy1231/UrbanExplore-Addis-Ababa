@@ -1,15 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Banknote, CalendarDays, Ticket } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import {
   ConsolePageShell,
   ConsoleHeader,
   SectionTitle,
   StatusPill,
-  ConsoleKpiCard,
 } from '@/components/dashboard/console'
 import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
+import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { AdminBackLink } from '@/components/dashboard/admin-back-link'
+import { AdminKpiCard } from '@/components/dashboard/admin-kpi-card'
 import { OrganizerVerificationActions } from '@/components/dashboard/admin-actions'
 import { cn } from '@/lib/utils'
 
@@ -66,19 +69,14 @@ export default async function AdminOrganizerDetailPage({
   }
 
   const kpis = [
-    { label: 'Events', value: String(events.length), accent: false },
-    { label: 'Tickets sold', value: String(ticketsSold), accent: true },
-    { label: 'Paid revenue', value: `ETB ${paidRevenue.toLocaleString('en-US')}`, accent: false },
+    { label: 'Events', value: String(events.length), icon: CalendarDays, tone: 'indigo' as const },
+    { label: 'Tickets sold', value: String(ticketsSold), icon: Ticket, tone: 'mint' as const },
+    { label: 'Paid revenue', value: `ETB ${paidRevenue.toLocaleString('en-US')}`, icon: Banknote, tone: 'sand' as const },
   ]
 
   return (
     <ConsolePageShell>
-      <Link
-        href="/dashboard/admin/organizers"
-        className="text-xs font-semibold uppercase tracking-widest text-app-muted transition-colors hover:text-ember"
-      >
-        ← Back to organizers
-      </Link>
+      <AdminBackLink href="/dashboard/admin/organizers">Back to organizers</AdminBackLink>
 
       <ConsoleHeader
         eyebrow="Organizer · admin view"
@@ -93,8 +91,8 @@ export default async function AdminOrganizerDetailPage({
 
       {/* About */}
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className={cn(CONSOLE_SURFACE, 'space-y-2 p-5 text-sm')}>
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-app-muted">Contact</h2>
+        <div className={cn(CONSOLE_CARD, 'space-y-2 p-5 text-sm')}>
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-console-muted">Contact</h2>
           <p>{o.email ?? 'No public email'}</p>
           <p className="text-xs tabular-nums text-app-muted">
             ID: {o.id.slice(0, 8).toUpperCase()}
@@ -102,15 +100,15 @@ export default async function AdminOrganizerDetailPage({
               ` · joined ${new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`}
           </p>
         </div>
-        <div className={cn(CONSOLE_SURFACE, 'space-y-2 p-5 text-sm')}>
-          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-app-muted">About</h2>
-          <p className="leading-relaxed text-app-muted">{o.description ?? 'No bio provided yet.'}</p>
+        <div className={cn(CONSOLE_CARD, 'space-y-2 p-5 text-sm')}>
+          <h2 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-console-muted">About</h2>
+          <p className="leading-relaxed text-console-muted">{o.description ?? 'No bio provided yet.'}</p>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {kpis.map((kpi) => (
-          <ConsoleKpiCard key={kpi.label} label={kpi.label} value={kpi.value} accent={kpi.accent} />
+          <AdminKpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={kpi.icon} tone={kpi.tone} />
         ))}
       </section>
 
@@ -125,7 +123,7 @@ export default async function AdminOrganizerDetailPage({
         ) : (
           <div className="space-y-2">
             {events.map((e) => (
-              <div key={e.id} className={cn(CONSOLE_SURFACE, 'flex items-center justify-between p-4')}>
+              <div key={e.id} className={cn(CONSOLE_CARD, 'flex items-center justify-between p-4')}>
                 <div className="min-w-0">
                   <Link
                     href={`/dashboard/admin/events/${e.id}`}

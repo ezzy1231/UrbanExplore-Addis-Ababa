@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { ConsolePageShell, ConsoleHeader, FilterChip } from '@/components/dashboard/console'
-import { CONSOLE_SURFACE } from '@/components/dashboard/console-shared'
+import { AdminSearchBar } from '@/components/dashboard/admin-search'
 import { AdminTable } from '@/components/dashboard/admin-table'
 import { cn } from '@/lib/utils'
 
@@ -9,10 +9,18 @@ export const metadata: Metadata = { title: 'Audit log · Admin' }
 const ENTITY_FILTERS = ['all', 'profile', 'business', 'organizer', 'event', 'reservation'] as const
 const PAGE_SIZE = 50
 
-function prefixTone(action: string): '[OK]' | '[WARN]' | '[INFO]' {
-  if (/rejected|suspend|cancel|failed/.test(action)) return '[WARN]'
-  if (/approved|verified|confirm|reinstate|published/.test(action)) return '[OK]'
-  return '[INFO]'
+type ActionTone = 'ok' | 'bad' | 'info'
+
+function actionTone(action: string): ActionTone {
+  if (/rejected|suspend|cancel|failed/.test(action)) return 'bad'
+  if (/approved|verified|confirm|reinstate|published/.test(action)) return 'ok'
+  return 'info'
+}
+
+const ACTION_DOT: Record<ActionTone, string> = {
+  ok: 'bg-success',
+  bad: 'bg-danger',
+  info: 'bg-console-muted',
 }
 
 type AuditRow = { id: string; actor_id: string | null; action: string; entity_type: string | null; entity_id: string | null; metadata: Record<string, unknown> | null; created_at: string }
@@ -47,12 +55,13 @@ export default async function AdminAuditPage({
     <ConsolePageShell maxWidth="max-w-7xl">
       <ConsoleHeader eyebrow="Admin console" title="Audit log" subtitle="Administrative and partner activity with actor and entity details." />
       <div className="space-y-3">
-        <form method="get" className={cn(CONSOLE_SURFACE, 'flex items-center gap-3 px-3 py-2')}>
-          <label htmlFor="audit-search" className="sr-only">Filter audit actions</label>
-          <input id="audit-search" type="search" name="q" defaultValue={q} placeholder="Filter by action…" className="min-h-10 w-full bg-transparent text-sm text-app-fg outline-none placeholder:text-app-muted" />
-          {entityFilter !== 'all' && <input type="hidden" name="entity" value={entityFilter} />}
-          <button className="min-h-10 rounded-lg bg-ember px-4 text-xs font-semibold text-on-accent">Search</button>
-        </form>
+        <AdminSearchBar
+          id="audit-search"
+          label="Filter audit actions"
+          placeholder="Filter by action…"
+          defaultValue={q}
+          hiddenFields={{ entity: entityFilter === 'all' ? undefined : entityFilter }}
+        />
         <div className="flex flex-wrap gap-2">
           {ENTITY_FILTERS.map((entity) => <FilterChip key={entity} href={`/dashboard/admin/audit?entity=${entity}${q ? `&q=${encodeURIComponent(q)}` : ''}`} active={entityFilter === entity}>{entity}</FilterChip>)}
         </div>
@@ -71,9 +80,12 @@ export default async function AdminAuditPage({
         columns={[{ key: 'action', label: 'Action', sortable: true }, { key: 'actor', label: 'Actor' }, { key: 'entity_type', label: 'Entity', sortable: true }, { key: 'metadata', label: 'Details' }, { key: 'created_at', label: 'Timestamp', sortable: true }]}
         rows={rows.map((row) => {
           const metadata = Object.entries(row.metadata ?? {}).map(([key, value]) => `${key}=${String(value)}`).join(' · ')
-          const prefix = prefixTone(row.action)
+          const tone = actionTone(row.action)
           return { key: row.id, cells: [
-            <span key="action" className="whitespace-nowrap font-mono"><span className="mr-2 text-app-muted">{prefix}</span>{row.action}</span>,
+            <span key="action" className="inline-flex items-center gap-2 whitespace-nowrap font-mono">
+              <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', ACTION_DOT[tone])} />
+              {row.action}
+            </span>,
             <span key="actor">{actors.get(row.actor_id ?? '') ?? 'system'}</span>,
             <span key="entity" className="whitespace-nowrap font-mono text-app-muted">{row.entity_type ?? '—'}{row.entity_id ? ` #${row.entity_id.slice(0, 8)}` : ''}</span>,
             <span key="metadata" className="text-app-muted">{metadata || '—'}</span>,
