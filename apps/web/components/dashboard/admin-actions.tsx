@@ -3,9 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  BadgeCheck,
   Ban,
-  Check,
   ChevronDown,
   EyeOff,
   Loader2,
@@ -20,8 +18,6 @@ import {
   adminSetBusinessActive,
   adminSetUserSuspended,
   adminSetUserRole,
-  adminVerifyOrganizer,
-  setBusinessVerification,
 } from '@/app/dashboard/actions'
 import { toast } from './console-toast'
 
@@ -32,6 +28,11 @@ import { toast } from './console-toast'
  *
  * The success string returned by every action used to be discarded; it is now
  * the toast title so a decision is never silent.
+ *
+ * Verification decisions deliberately do NOT live here: partners are approved
+ * or declined only from the Verification queue, where the reviewer sees the
+ * submitted documents and must leave a note. These controls cover moderation
+ * (suspension, event lifecycle, bookings, roles).
  */
 
 const chip =
@@ -52,95 +53,6 @@ function ActionIcon({ pending, icon: Icon }: { pending: boolean; icon: LucideIco
 
 function reportFailure(message: string, fallback = 'Please try again.') {
   toast.error('Action failed', message || fallback)
-}
-
-export function BusinessLifecycleActions({
-  businessId,
-  status,
-}: {
-  businessId: string
-  status: string
-}) {
-  const [pending, startTransition] = useTransition()
-
-  function run(approve: boolean) {
-    if (!approve && !window.confirm('Reject this business verification request?')) return
-    startTransition(async () => {
-      const result = await setBusinessVerification(businessId, approve)
-      if (!result.ok) {
-        reportFailure(result.message)
-        return
-      }
-      toast.success(result.message)
-      // A full navigation forces the server-rendered business list/detail to
-      // read its current status from Supabase after moderation.
-      window.location.reload()
-    })
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {status === 'pending' && (
-        <button type="button" disabled={pending} onClick={() => run(true)} className={chipOk}>
-          <ActionIcon pending={pending} icon={BadgeCheck} />
-          {pending ? 'Verifying…' : 'Verify'}
-        </button>
-      )}
-      {status === 'rejected' && (
-        <button type="button" disabled={pending} onClick={() => run(true)} className={chipOk}>
-          <ActionIcon pending={pending} icon={Check} />
-          {pending ? 'Approving…' : 'Approve & activate'}
-        </button>
-      )}
-      {(status === 'active' || status === 'pending') && (
-        <button type="button" disabled={pending} onClick={() => run(false)} className={chipBad}>
-          <ActionIcon pending={pending} icon={X} />
-          Reject
-        </button>
-      )}
-    </div>
-  )
-}
-
-export function OrganizerVerificationActions({
-  organizerId,
-  status,
-}: {
-  organizerId: string
-  status: string
-}) {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-
-  function act(approve: boolean) {
-    if (!approve && !window.confirm('Reject this organizer verification?')) return
-    startTransition(async () => {
-      const result = await adminVerifyOrganizer(organizerId, approve)
-      if (!result.ok) {
-        reportFailure(result.message)
-        return
-      }
-      toast.success(result.message)
-      router.refresh()
-    })
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {(status === 'pending' || status === 'rejected') && (
-        <>
-          <button type="button" disabled={pending} onClick={() => act(true)} className={chipOk}>
-            <ActionIcon pending={pending} icon={BadgeCheck} />
-            {pending ? 'Verifying…' : 'Verify'}
-          </button>
-          <button type="button" disabled={pending} onClick={() => act(false)} className={chipBad}>
-            <ActionIcon pending={pending} icon={X} />
-            Reject
-          </button>
-        </>
-      )}
-    </div>
-  )
 }
 
 const ROLE_OPTIONS = [

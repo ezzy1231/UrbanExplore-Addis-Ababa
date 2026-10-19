@@ -10,7 +10,7 @@ import {
 } from '@/components/dashboard/console'
 import { statusTone } from '@/components/dashboard/console-shared'
 import { AdminSearchBar } from '@/components/dashboard/admin-search'
-import { BusinessLifecycleActions, BusinessSuspendAction } from '@/components/dashboard/admin-actions'
+import { BusinessSuspendAction } from '@/components/dashboard/admin-actions'
 import { AdminTable } from '@/components/dashboard/admin-table'
 
 export const metadata: Metadata = { title: 'Businesses · Admin' }
@@ -58,7 +58,7 @@ export default async function AdminBusinessesPage({
       <ConsoleHeader
         eyebrow="Admin console"
         title="Businesses"
-        subtitle="Verification, suspension, and drilldown per partner."
+        subtitle="Partner directory with suspension controls. Verification decisions happen in the Verification queue."
       />
 
       <div className="flex flex-col gap-3">
@@ -110,7 +110,13 @@ export default async function AdminBusinessesPage({
             )}
           </span>,
           <span key="created_at" className="whitespace-nowrap tabular-nums text-app-muted">{new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>,
-          <div key="actions" className="flex flex-wrap justify-end gap-2"><BusinessLifecycleActions businessId={row.id} status={row.status} /><BusinessSuspendAction businessId={row.id} status={row.status} /></div>,
+          <div key="actions" className="flex flex-wrap justify-end gap-2">
+            {row.status === 'active' || row.status === 'inactive' ? (
+              <BusinessSuspendAction businessId={row.id} status={row.status} />
+            ) : (
+              <span className="text-console-muted">—</span>
+            )}
+          </div>,
         ] }))}
       />
     </ConsolePageShell>

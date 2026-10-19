@@ -32,7 +32,6 @@ import {
 } from '@/components/dashboard/admin-period'
 import { ConsoleChartCard } from '@/components/dashboard/console-chart'
 import { AdminActivityFeed, type AdminActivityItem } from '@/components/dashboard/admin-activity-feed'
-import { BusinessVerificationActions } from '@/components/dashboard/business-verification-actions'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Admin Console' }
@@ -346,18 +345,18 @@ export default async function AdminDashboardPage({
                     <p className="truncate text-sm font-semibold text-console-ink">{row.name}</p>
                     <p className="text-xs text-console-muted">Submitted {relativeTime(row.created_at)}</p>
                   </div>
-                  <BusinessVerificationActions businessId={row.id} />
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-console-sand px-2.5 py-1 text-[11px] font-bold text-console-sand-ink">
+                    Awaiting decision
+                  </span>
                 </div>
               ))}
-              {pendingCount > pendingRows.length && (
-                <Link
-                  href="/dashboard/admin/businesses?status=pending"
-                  className="flex min-h-11 items-center justify-center gap-1 text-sm font-semibold text-console-indigo transition-colors hover:bg-console-bg/60"
-                >
-                  View all {pendingCount} requests
-                  <ArrowUpRight className="size-4" aria-hidden="true" />
-                </Link>
-              )}
+              <Link
+                href="/dashboard/admin/verification"
+                className="flex min-h-11 items-center justify-center gap-1 text-sm font-semibold text-console-indigo transition-colors hover:bg-console-bg/60"
+              >
+                Review in Verification
+                <ArrowUpRight className="size-4" aria-hidden="true" />
+              </Link>
             </div>
           ) : (
             <div className={cn(CONSOLE_SURFACE, 'flex flex-col items-center justify-center px-6 py-12 text-center')}>

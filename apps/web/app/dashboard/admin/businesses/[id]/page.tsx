@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { BadgeCheck, MapPin, Store, UtensilsCrossed } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -9,10 +10,10 @@ import {
   StatusPill,
 } from '@/components/dashboard/console'
 import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
-import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { CONSOLE_CARD, CONSOLE_SECONDARY_BUTTON } from '@/components/dashboard/console-tokens'
 import { AdminBackLink } from '@/components/dashboard/admin-back-link'
 import { AdminKpiCard } from '@/components/dashboard/admin-kpi-card'
-import { BusinessLifecycleActions, BusinessSuspendAction } from '@/components/dashboard/admin-actions'
+import { BusinessSuspendAction } from '@/components/dashboard/admin-actions'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Business detail · Admin' }
@@ -96,7 +97,11 @@ export default async function AdminBusinessDetailPage({
         title={b.name}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <BusinessLifecycleActions businessId={b.id} status={b.status} />
+            {(b.status === 'pending' || b.status === 'rejected') && (
+              <Link href="/dashboard/admin/verification" className={CONSOLE_SECONDARY_BUTTON}>
+                Review in Verification
+              </Link>
+            )}
             <BusinessSuspendAction businessId={b.id} status={b.status} />
           </div>
         }

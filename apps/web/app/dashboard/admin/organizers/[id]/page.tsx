@@ -10,10 +10,9 @@ import {
   StatusPill,
 } from '@/components/dashboard/console'
 import { CONSOLE_SURFACE, statusTone } from '@/components/dashboard/console-shared'
-import { CONSOLE_CARD } from '@/components/dashboard/console-tokens'
+import { CONSOLE_CARD, CONSOLE_SECONDARY_BUTTON } from '@/components/dashboard/console-tokens'
 import { AdminBackLink } from '@/components/dashboard/admin-back-link'
 import { AdminKpiCard } from '@/components/dashboard/admin-kpi-card'
-import { OrganizerVerificationActions } from '@/components/dashboard/admin-actions'
 import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Organizer detail · Admin' }
@@ -84,7 +83,11 @@ export default async function AdminOrganizerDetailPage({
         action={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={o.status} tone={statusTone(o.status)} />
-            <OrganizerVerificationActions organizerId={o.id} status={o.status} />
+            {(o.status === 'pending' || o.status === 'rejected') && (
+              <Link href="/dashboard/admin/verification" className={CONSOLE_SECONDARY_BUTTON}>
+                Review in Verification
+              </Link>
+            )}
           </div>
         }
       />

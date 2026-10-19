@@ -10,7 +10,6 @@ import {
 } from '@/components/dashboard/console'
 import { statusTone } from '@/components/dashboard/console-shared'
 import { AdminSearchBar } from '@/components/dashboard/admin-search'
-import { OrganizerVerificationActions } from '@/components/dashboard/admin-actions'
 import { AdminTable } from '@/components/dashboard/admin-table'
 
 export const metadata: Metadata = { title: 'Organizers · Admin' }
@@ -59,7 +58,7 @@ export default async function AdminOrganizersPage({
       <ConsoleHeader
         eyebrow="Admin console"
         title="Organizers"
-        subtitle="Verify event organizers before their profiles go public."
+        subtitle="Event organizer directory. Verification decisions happen in the Verification queue."
       />
 
       <div className="flex flex-col gap-3">
@@ -101,7 +100,7 @@ export default async function AdminOrganizersPage({
           total={count ?? 0}
           error={Boolean(error)}
           emptyText="No organizers match this filter."
-          columns={[{ key: 'name', label: 'Organizer', sortable: true }, { key: 'email', label: 'Email', sortable: true }, { key: 'status', label: 'Status', sortable: true }, { key: 'verified', label: 'Verified' }, { key: 'created_at', label: 'Joined', sortable: true }, { key: 'actions', label: 'Actions', align: 'right' }]}
+          columns={[{ key: 'name', label: 'Organizer', sortable: true }, { key: 'email', label: 'Email', sortable: true }, { key: 'status', label: 'Status', sortable: true }, { key: 'verified', label: 'Verified' }, { key: 'created_at', label: 'Joined', sortable: true }]}
           rows={rows.map((row) => ({ key: row.id, cells: [
             <Link key="organizer" href={`/dashboard/admin/organizers/${row.id}`} className="font-semibold underline-offset-2 hover:underline">{row.name}</Link>,
             <span key="email" className="text-app-muted">{row.email ?? 'No public email'}</span>,
@@ -119,7 +118,6 @@ export default async function AdminOrganizersPage({
               )}
             </span>,
             <span key="joined" className="whitespace-nowrap tabular-nums text-app-muted">{new Date(row.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>,
-            <OrganizerVerificationActions key="actions" organizerId={row.id} status={row.status} />,
           ] }))}
         />
       </section>
