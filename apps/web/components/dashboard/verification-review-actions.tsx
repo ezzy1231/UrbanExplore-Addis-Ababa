@@ -1,12 +1,14 @@
-"use client";
+'use client'
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { reviewVerificationRequest } from "@/app/dashboard/actions";
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
+import { reviewVerificationRequest } from '@/app/dashboard/actions'
 import {
   CONSOLE_PRIMARY_BUTTON,
   CONSOLE_SECONDARY_BUTTON,
-} from "@/components/dashboard/console-tokens";
+} from '@/components/dashboard/console-tokens'
+import { toast } from './console-toast'
 
 /**
  * The admin's decision on one queued request.
@@ -21,40 +23,42 @@ import {
  */
 
 const DECISIONS = [
-  { value: "start_review", label: "Start review", primary: false },
-  { value: "needs_info", label: "Request more info", primary: false },
-  { value: "approve", label: "Approve", primary: true },
-  { value: "reject", label: "Decline", primary: false },
-] as const;
+  { value: 'start_review', label: 'Start review', primary: false },
+  { value: 'needs_info', label: 'Request more info', primary: false },
+  { value: 'approve', label: 'Approve', primary: true },
+  { value: 'reject', label: 'Decline', primary: false },
+] as const
 
 export default function VerificationReviewActions({
   requestId,
   status,
 }: {
-  requestId: string;
-  status: string;
+  requestId: string
+  status: string
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [note, setNote] = useState("");
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
-    null,
-  );
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [pendingDecision, setPendingDecision] = useState<string | null>(null)
+  const [note, setNote] = useState('')
 
-  const isOpen = ["pending", "in_review", "needs_info"].includes(status);
+  const isOpen = ['pending', 'in_review', 'needs_info'].includes(status)
   const visible = isOpen
     ? DECISIONS
-    : DECISIONS.filter((d) => d.value === "start_review")
+    : DECISIONS.filter((decision) => decision.value === 'start_review')
 
-  function decide(decision: string) {
+  function decide(decision: string, label: string) {
+    setPendingDecision(decision)
     startTransition(async () => {
-      const result = await reviewVerificationRequest(requestId, decision, note);
-      setMessage({ ok: result.ok, text: result.message });
-      if (result.ok) {
-        setNote("");
-        router.refresh();
+      const result = await reviewVerificationRequest(requestId, decision, note)
+      setPendingDecision(null)
+      if (!result.ok) {
+        toast.error(`${label} failed`, result.message || 'Please try again.')
+        return
       }
-    });
+      toast.success(result.message)
+      setNote('')
+      router.refresh()
+    })
   }
 
   if (!isOpen) {
@@ -63,7 +67,7 @@ export default function VerificationReviewActions({
         This request was decided and is kept as history. A new submission from
         this partner will create a new request.
       </div>
-    );
+    )
   }
 
   return (
@@ -74,40 +78,33 @@ export default function VerificationReviewActions({
           rows={3}
           value={note}
           maxLength={2000}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(event) => setNote(event.target.value)}
           placeholder="What you checked, and anything the partner should know."
           className="mt-1.5 w-full rounded-xl border border-console-border bg-white px-3.5 py-2.5 text-sm text-console-ink outline-none transition focus:border-console-indigo/50 focus:ring-2 focus:ring-console-indigo/10"
         />
       </label>
 
       <div className="flex flex-wrap gap-2">
-        {visible.map((d) => (
-          <button
-            key={d.value}
-            type="button"
-            disabled={pending}
-            onClick={() => decide(d.value)}
-            className={`${
-              d.primary ? CONSOLE_PRIMARY_BUTTON : CONSOLE_SECONDARY_BUTTON
-            } disabled:opacity-60`}
-          >
-            {pending ? "Working…" : d.label}
-          </button>
-        ))}
+        {visible.map((decision) => {
+          const working = pending && pendingDecision === decision.value
+          return (
+            <button
+              key={decision.value}
+              type="button"
+              disabled={pending}
+              onClick={() => decide(decision.value, decision.label)}
+              className={`${
+                decision.primary ? CONSOLE_PRIMARY_BUTTON : CONSOLE_SECONDARY_BUTTON
+              } disabled:opacity-60`}
+            >
+              {working && (
+                <Loader2 aria-hidden="true" className="size-3.5 animate-spin" strokeWidth={2.4} />
+              )}
+              {working ? 'Working…' : decision.label}
+            </button>
+          )
+        })}
       </div>
-
-      {message && (
-        <p
-          role="status"
-          className={`rounded-xl px-4 py-3 text-sm font-medium ${
-            message.ok
-              ? "bg-console-mint text-console-mint-ink"
-              : "bg-console-blush text-console-blush-ink"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
     </div>
-  );
+  )
 }

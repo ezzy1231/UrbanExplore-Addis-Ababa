@@ -35,6 +35,10 @@ export async function middleware(request: NextRequest) {
     adminPortal &&
     !pathname.startsWith("/dashboard/admin") &&
     !pathname.startsWith("/auth/") &&
+    // The notification bell fetches its feed from every console. The handler
+    // authenticates the session itself, so serving it on the admin deployment
+    // grants no access beyond what the signed-in admin already has.
+    !pathname.startsWith("/api/notifications") &&
     pathname !== "/api/health"
   ) {
     if (!mainOrigin || pathname === "/") {

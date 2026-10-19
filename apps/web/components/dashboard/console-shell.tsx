@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3,
-  Bell,
   CalendarCheck,
   CalendarDays,
   Building2,
@@ -15,16 +14,21 @@ import {
   MapPin,
   Menu as MenuIcon,
   Rocket,
+  Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   Ticket,
   Utensils,
   UtensilsCrossed,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { ConsoleNotificationBell } from './console-notifications'
+import { ConsoleToaster } from './console-toast'
 
 /**
  * Shared console shell for partner and admin dashboards.
@@ -36,6 +40,10 @@ import { createClient } from '@/lib/supabase/client'
 export type ConsoleNavItem = {
   label: string
   href: string
+  /** Optional rail grouping label, e.g. "Moderation". */
+  section?: string
+  /** Attention count rendered as a pill on the rail item. 0 hides it. */
+  badge?: number
 }
 
 /**
@@ -46,7 +54,8 @@ export type ConsoleNavItem = {
 const NAV_ICONS: Record<string, LucideIcon> = {
   Dashboard: LayoutDashboard,
   Overview: LayoutDashboard,
-  Users: LayoutDashboard,
+  Users: Users,
+  Verification: ShieldCheck,
   Businesses: Building2,
   Organizers: CalendarCheck,
   'Audit Log': BarChart3,
@@ -83,6 +92,8 @@ type ConsoleShellProps = {
    */
   homeHref?: string
   settingsHref?: string
+  /** Optional top-bar search. Only the admin rail passes one today. */
+  search?: { action: string; placeholder: string; defaultValue?: string }
   children: React.ReactNode
 }
 
@@ -211,34 +222,69 @@ function ConsoleNav({
   const pathname = usePathname()
   const isActive = useIsActive(pathname)
 
+  const groups: Array<{ section: string | null; items: ConsoleNavItem[] }> = []
+  for (const item of navItems) {
+    const section = item.section ?? null
+    const last = groups[groups.length - 1]
+    if (last && last.section === section) last.items.push(item)
+    else groups.push({ section, items: [item] })
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="px-5 pb-6 pt-6">
         <ConsoleBrand account={account} homeHref={homeHref} />
       </div>
 
-      <nav aria-label="Dashboard sections" className="flex-1 space-y-1 overflow-y-auto px-3">
-        {navItems.map((item) => {
-          const active = isActive(item.href)
-          const Icon = NAV_ICONS[item.label] ?? LayoutDashboard
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'flex min-h-11 items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-200',
-                active
-                  ? 'bg-console-nav-accent text-white shadow-[0_6px_18px_rgb(63_114_190/0.4)]'
-                  : 'text-console-nav-muted hover:bg-console-nav-soft hover:text-white',
-              )}
-            >
-              <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.4 : 1.9} />
-              {item.label}
-            </Link>
-          )
-        })}
+      <nav aria-label="Dashboard sections" className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+        {groups.map((group, groupIndex) => (
+          <div key={group.section ?? `group-${groupIndex}`} className="space-y-1">
+            {group.section && (
+              <p className="px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-console-nav-muted/70">
+                {group.section}
+              </p>
+            )}
+            {group.items.map((item) => {
+              const active = isActive(item.href)
+              const Icon = NAV_ICONS[item.label] ?? LayoutDashboard
+              const badge = item.badge ?? 0
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'group relative flex min-h-11 items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-200',
+                    active
+                      ? 'bg-console-nav-accent text-white shadow-[0_6px_18px_rgb(63_114_190/0.4)]'
+                      : 'text-console-nav-muted hover:bg-console-nav-soft hover:text-white',
+                  )}
+                >
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-white/80"
+                    />
+                  )}
+                  <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.4 : 1.9} />
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {badge > 0 && (
+                    <span
+                      aria-label={`${badge} waiting`}
+                      className={cn(
+                        'flex min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-5 tabular-nums',
+                        active ? 'bg-white text-console-nav-accent' : 'bg-[#D9363E] text-white',
+                      )}
+                    >
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
       {primaryAction && (
@@ -259,50 +305,6 @@ function ConsoleNav({
         </div>
       )}
 
-    </div>
-  )
-}
-
-function ConsoleBell({ count, settingsHref }: { count: number; settingsHref: string }) {
-  const [open, setOpen] = useState(false)
-  const ref = useDismissOnOutside(open, () => setOpen(false))
-  const id = useId()
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={id}
-        aria-label={count > 0 ? `Notifications, ${count} unread` : 'Notifications'}
-        className="relative flex size-10 items-center justify-center rounded-xl text-console-muted transition-colors hover:bg-console-bg hover:text-console-ink"
-      >
-        <Bell className="size-[19px]" strokeWidth={2.1} />
-        {count > 0 && (
-          <span className="absolute right-1 top-1 flex min-w-[18px] items-center justify-center rounded-full bg-[#E5484D] px-1 text-[10px] font-bold leading-[18px] text-white ring-2 ring-console-card">
-            {count > 9 ? '9+' : count}
-          </span>
-        )}
-      </button>
-      <div
-        id={id}
-        hidden={!open}
-        className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-console-border bg-console-card p-4 shadow-elevate"
-      >
-        <p className="text-sm font-bold text-console-ink">Notifications</p>
-        <p className="mt-1 text-xs text-console-muted">
-          {count > 0
-            ? `You have ${count} unread update${count === 1 ? '' : 's'}.`
-            : 'You are all caught up.'}
-        </p>
-        <Link
-          href={`${settingsHref}#notifications`}
-          className="mt-3 block text-xs font-semibold text-console-indigo hover:underline"
-        >
-          Notification settings
-        </Link>
-      </div>
     </div>
   )
 }
@@ -411,6 +413,7 @@ export function ConsoleShell({
   showPromo = true,
   homeHref = '/dashboard',
   settingsHref = '/dashboard',
+  search,
   children,
 }: ConsoleShellProps) {
   const pathname = usePathname()
@@ -419,6 +422,7 @@ export function ConsoleShell({
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
   const menuButtonRef = useRef<HTMLButtonElement | null>(null)
   const panelRef = useDrawerBehaviour(drawerOpen, closeDrawer, menuButtonRef)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   const title =
     navItems.find((item) => isActive(item.href) && item.href !== pathname)?.label ??
@@ -430,6 +434,25 @@ export function ConsoleShell({
   useEffect(() => {
     setDrawerOpen(false)
   }, [pathname])
+
+  // `/` focuses the operator search, the way every desktop tool does it.
+  useEffect(() => {
+    if (!search) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return
+      }
+      event.preventDefault()
+      searchInputRef.current?.focus()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [search])
 
   return (
     <div className="shell-console min-h-screen bg-console-bg">
@@ -505,7 +528,44 @@ export function ConsoleShell({
               {title}
             </h1>
 
-            <ConsoleBell count={notificationCount} settingsHref={settingsHref} />
+            {search && (
+              <form
+                action={search.action}
+                method="get"
+                role="search"
+                className="relative hidden md:block"
+              >
+                <label htmlFor="console-search" className="sr-only">
+                  {search.placeholder}
+                </label>
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-console-muted"
+                  strokeWidth={2.1}
+                />
+                <input
+                  ref={searchInputRef}
+                  id="console-search"
+                  name="q"
+                  type="search"
+                  defaultValue={search.defaultValue}
+                  placeholder={search.placeholder}
+                  aria-keyshortcuts="/"
+                  className="h-10 w-44 rounded-xl border border-console-border bg-console-bg/70 pl-9 pr-8 text-[13px] text-console-ink outline-none transition-all placeholder:text-console-muted focus:w-64 focus:border-console-indigo/40 focus:bg-console-card lg:w-56"
+                />
+                <kbd
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-console-border bg-console-card px-1.5 text-[10px] font-semibold text-console-muted"
+                >
+                  /
+                </kbd>
+              </form>
+            )}
+
+            <ConsoleNotificationBell
+              initialCount={notificationCount}
+              settingsHref={settingsHref}
+            />
             <ConsoleProfile account={account} settingsHref={settingsHref} />
           </div>
         </header>
@@ -514,6 +574,8 @@ export function ConsoleShell({
           {children}
         </main>
       </div>
+
+      <ConsoleToaster />
     </div>
   )
 }

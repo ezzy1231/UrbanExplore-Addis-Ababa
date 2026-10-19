@@ -1,153 +1,279 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import {
+  Building2,
+  CalendarCheck,
+  CalendarDays,
+  Ticket,
+  UserRoundCheck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import {
   ConsolePageShell,
   ConsoleHeader,
-  ConsoleKpiCard,
+  ConsoleRangeLinks,
 } from '@/components/dashboard/console'
-import { ConsoleAreaChart } from '@/components/dashboard/console-area-chart'
+import { CONSOLE_SURFACE } from '@/components/dashboard/console-shared'
+import {
+  AdminKpiCard,
+  type AdminKpiDelta,
+  type AdminKpiTone,
+} from '@/components/dashboard/admin-kpi-card'
+import {
+  RANGE_DAYS,
+  bucketSeries,
+  parseRange,
+  periodDelta,
+  startOfUtcDay,
+} from '@/components/dashboard/admin-period'
+import { ConsoleChartCard, ConsoleDonutChart } from '@/components/dashboard/console-chart'
+import { formatETB } from '@/lib/console-format'
+import { cn } from '@/lib/utils'
 
 export const metadata: Metadata = { title: 'Metrics · Admin' }
 
-const WINDOW_DAYS = 30
-
-function shiftDays(iso: string, days: number): string {
-  const d = new Date(iso)
-  d.setUTCDate(d.getUTCDate() - days)
-  return d.toISOString()
+const ROLE_LABELS: Record<string, string> = {
+  customer: 'Customers',
+  food_business: 'Food businesses',
+  event_organizer: 'Event organizers',
+  system_admin: 'Admins',
 }
 
-function trend(current: number, previous: number) {
-  if (previous === 0 && current === 0) return undefined
-  if (previous === 0) return { direction: 'flat' as const, text: `${current} in the last 30d` }
-  const pct = Math.round(((current - previous) / previous) * 100)
-  if (pct === 0) return { direction: 'flat' as const, text: 'No change vs prior 30d' }
-  return {
-    direction: pct > 0 ? ('up' as const) : ('down' as const),
-    text: `${Math.abs(pct)}% vs prior 30d`,
-  }
+type PaidPurchase = { quantity: number | null; amount: number | null; created_at: string }
+
+function sumAmount(rows: PaidPurchase[]) {
+  return rows.reduce((total, row) => total + (Number(row.amount) || 0), 0)
 }
 
-/** Bucket timestamped rows into per-day counts across the last N days. */
-function dailySeries(timestamps: string[], days: number) {
-  const today = new Date().toISOString().slice(0, 10)
-  const buckets = new Map<string, number>()
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(`${today}T00:00:00Z`)
-    d.setUTCDate(d.getUTCDate() - i)
-    buckets.set(d.toISOString().slice(0, 10), 0)
-  }
-  for (const ts of timestamps) {
-    const day = ts.slice(0, 10)
-    if (buckets.has(day)) buckets.set(day, (buckets.get(day) ?? 0) + 1)
-  }
-  return Array.from(buckets.entries()).map(([date, value]) => ({
-    label: new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-    value,
-  }))
+type MetricCard = {
+  label: string
+  value: string | number
+  icon: LucideIcon
+  tone: AdminKpiTone
+  href?: string
+  delta?: AdminKpiDelta
+  sparkline?: number[]
 }
 
-export default async function AdminMetricsPage() {
+export default async function AdminMetricsPage({
+  searchParams,
+}: {
+  searchParams?: { range?: string }
+}) {
+  const range = parseRange(searchParams?.range)
+  const days = RANGE_DAYS[range]
+
   const supabase = await createClient()
   const nowIso = new Date().toISOString()
-  const startIso = shiftDays(nowIso, WINDOW_DAYS - 1)
-  const prevStartIso = shiftDays(startIso, WINDOW_DAYS)
+  const currentStartIso = startOfUtcDay(days - 1)
+  const previousStartIso = startOfUtcDay(days * 2 - 1)
+  const currentStartDate = currentStartIso.slice(0, 10)
+  const previousStartDate = previousStartIso.slice(0, 10)
+  const todayDate = nowIso.slice(0, 10)
 
-  const [usersRes, businessesRes, organizersRes, eventsRes] = await Promise.all([
+  const [usersRes, businessesRes, organizersRes, eventsRes, rolesRes] = await Promise.all([
     supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('businesses').select('id', { count: 'exact', head: true }),
     supabase.from('organizers').select('id', { count: 'exact', head: true }),
     supabase.from('events').select('id', { count: 'exact', head: true }).eq('status', 'published'),
+    supabase.from('profiles').select('role').limit(5000),
   ])
 
-  // Windowed activity for trends + charts. Capped at 5000 rows per query —
+  // Windowed activity for trends + charts. Capped at 5,000 rows per query —
   // plenty at launch scale; move to an aggregate RPC when it isn't.
   const [signupsRes, reservationsRes, purchasesRes] = await Promise.all([
-    supabase.from('profiles').select('created_at').gte('created_at', prevStartIso).limit(5000),
+    supabase.from('profiles').select('created_at').gte('created_at', previousStartIso).limit(5000),
     supabase
       .from('reservations')
       .select('reservation_date')
-      .gte('reservation_date', prevStartIso.slice(0, 10))
+      .gte('reservation_date', previousStartDate)
       .limit(5000),
     supabase
       .from('ticket_purchases')
       .select('quantity, amount, payment_status, created_at')
-      .gte('created_at', prevStartIso)
+      .gte('created_at', previousStartIso)
       .eq('payment_status', 'paid')
       .limit(5000),
   ])
 
-  const signups = ((signupsRes.data ?? []) as Array<{ created_at: string }>)
-    .filter((r) => r.created_at >= prevStartIso && r.created_at <= nowIso)
-  const currentSignups = signups.filter((r) => r.created_at >= startIso).length
-  const prevSignups = signups.length - currentSignups
-
-  const bookings = ((reservationsRes.data ?? []) as Array<{ reservation_date: string }>)
-    .filter((r) => r.reservation_date >= prevStartIso.slice(0, 10) && r.reservation_date <= nowIso.slice(0, 10))
-  const currentBookings = bookings.filter((r) => r.reservation_date >= startIso.slice(0, 10)).length
-  const prevBookings = bookings.length - currentBookings
-
-  const paidPurchases = ((purchasesRes.data ?? []) as Array<{
-    quantity: number | null
-    amount: number | null
-    created_at: string
-  }>).filter((p) => p.created_at >= prevStartIso && p.created_at <= nowIso)
-  const currentTickets = paidPurchases
-    .filter((p) => p.created_at >= startIso)
-    .reduce((s, p) => s + (Number(p.quantity) || 0), 0)
-  const prevTickets =
-    paidPurchases.filter((p) => p.created_at < startIso).reduce((s, p) => s + (Number(p.quantity) || 0), 0)
-  const paidVolume30d = paidPurchases
-    .filter((p) => p.created_at >= startIso)
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0)
-
-  const signupSeries = dailySeries(signups.map((r) => r.created_at), WINDOW_DAYS)
-  const bookingSeries = dailySeries(
-    bookings.map((r) => `${r.reservation_date}T12:00:00Z`),
-    WINDOW_DAYS,
+  const signups = ((signupsRes.data ?? []) as Array<{ created_at: string }>).filter(
+    (row) => row.created_at >= previousStartIso && row.created_at <= nowIso,
   )
-  const ticketSeries = dailySeries(paidPurchases.map((p) => p.created_at), WINDOW_DAYS)
+  const currentSignups = signups.filter((row) => row.created_at >= currentStartIso)
+  const previousSignupCount = signups.length - currentSignups.length
 
-  const kpis = [
-    { label: 'Total users', value: String(usersRes.count ?? 0), trend: trend(currentSignups, prevSignups), accent: false },
-    { label: 'Businesses', value: String(businessesRes.count ?? 0), trend: undefined, accent: false },
-    { label: 'Organizers', value: String(organizersRes.count ?? 0), trend: undefined, accent: false },
-    { label: 'Live events', value: String(eventsRes.count ?? 0), trend: undefined, accent: false },
-    { label: 'Bookings · 30d', value: String(currentBookings), trend: trend(currentBookings, prevBookings), accent: false },
+  const reservations = ((reservationsRes.data ?? []) as Array<{ reservation_date: string }>).filter(
+    (row) => row.reservation_date >= previousStartDate && row.reservation_date <= todayDate,
+  )
+  const currentReservations = reservations.filter((row) => row.reservation_date >= currentStartDate)
+  const previousReservationCount = reservations.length - currentReservations.length
+
+  const purchases = ((purchasesRes.data ?? []) as PaidPurchase[]).filter(
+    (row) => row.created_at >= previousStartIso && row.created_at <= nowIso,
+  )
+  const currentPurchases = purchases.filter((row) => row.created_at >= currentStartIso)
+  const previousPurchases = purchases.filter((row) => row.created_at < currentStartIso)
+
+  const currentRevenue = sumAmount(currentPurchases)
+  const previousRevenue = sumAmount(previousPurchases)
+
+  const signupSeries = bucketSeries(
+    days,
+    currentSignups.map((row) => ({ day: row.created_at.slice(0, 10), value: 1 })),
+  )
+  const reservationSeries = bucketSeries(
+    days,
+    currentReservations.map((row) => ({ day: row.reservation_date, value: 1 })),
+  )
+  const ticketSeries = bucketSeries(
+    days,
+    currentPurchases.map((row) => ({ day: row.created_at.slice(0, 10), value: Number(row.quantity) || 0 })),
+  )
+  const revenueSeries = bucketSeries(
+    days,
+    currentPurchases.map((row) => ({ day: row.created_at.slice(0, 10), value: Number(row.amount) || 0 })),
+  )
+
+  const roleCounts = new Map<string, number>()
+  for (const row of (rolesRes.data ?? []) as Array<{ role: string | null }>) {
+    const role = row.role || 'customer'
+    roleCounts.set(role, (roleCounts.get(role) ?? 0) + 1)
+  }
+  const roleMix = Object.entries(ROLE_LABELS)
+    .map(([role, label]) => ({ label, value: roleCounts.get(role) ?? 0 }))
+    .filter((slice) => slice.value > 0)
+
+  const hadError = [
+    usersRes,
+    businessesRes,
+    organizersRes,
+    eventsRes,
+    rolesRes,
+    signupsRes,
+    reservationsRes,
+    purchasesRes,
+  ].some((result) => Boolean(result.error))
+
+  const kpis: MetricCard[] = [
     {
-      label: 'Paid ticket volume · 30d',
-      value: `ETB ${paidVolume30d.toLocaleString('en-US')}`,
-      trend: trend(currentTickets, prevTickets),
-      accent: true,
+      label: 'Total users',
+      value: usersRes.count ?? 0,
+      icon: Users,
+      tone: 'indigo',
+      href: '/dashboard/admin/users',
+      delta: periodDelta(currentSignups.length, previousSignupCount, days),
+      sparkline: signupSeries.map((point) => point.value),
+    },
+    {
+      label: 'Businesses',
+      value: businessesRes.count ?? 0,
+      icon: Building2,
+      tone: 'sand',
+      href: '/dashboard/admin/businesses',
+    },
+    {
+      label: 'Organizers',
+      value: organizersRes.count ?? 0,
+      icon: UserRoundCheck,
+      tone: 'sky',
+      href: '/dashboard/admin/organizers',
+    },
+    {
+      label: 'Live events',
+      value: eventsRes.count ?? 0,
+      icon: CalendarDays,
+      tone: 'mint',
+      href: '/dashboard/admin/events',
+    },
+    {
+      label: `Reservations · ${days}d`,
+      value: currentReservations.length,
+      icon: CalendarCheck,
+      tone: 'sky',
+      href: '/dashboard/admin/reservations',
+      delta: periodDelta(currentReservations.length, previousReservationCount, days),
+      sparkline: reservationSeries.map((point) => point.value),
+    },
+    {
+      label: `Paid ticket volume · ${days}d`,
+      value: formatETB(currentRevenue),
+      icon: Ticket,
+      tone: 'indigo',
+      delta: periodDelta(currentRevenue, previousRevenue, days),
+      sparkline: revenueSeries.map((point) => point.value),
     },
   ]
 
-  const charts: Array<{ title: string; points: Array<{ label: string; value: number }>; unit: string }> = [
-    { title: 'New signups', points: signupSeries, unit: 'users' },
-    { title: 'Reservations', points: bookingSeries, unit: 'reservations' },
-    { title: 'Paid tickets', points: ticketSeries, unit: 'tickets' },
-  ]
-
   return (
-    <ConsolePageShell>
+    <ConsolePageShell maxWidth="max-w-7xl">
       <ConsoleHeader
         eyebrow="Admin console"
-        title="Platform Metrics"
-        subtitle="Growth and activity across the whole marketplace."
+        title="Platform metrics"
+        subtitle={`Growth and activity across the whole marketplace, last ${days} days.`}
+        action={<ConsoleRangeLinks current={range} />}
       />
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      {hadError && (
+        <div
+          role="alert"
+          className={cn(
+            CONSOLE_SURFACE,
+            'flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-danger',
+          )}
+        >
+          <span>Some metrics could not be loaded — the figures below may be incomplete.</span>
+          <Link
+            href={`/dashboard/admin/metrics?range=${range}`}
+            className="font-semibold underline"
+          >
+            Retry
+          </Link>
+        </div>
+      )}
+
+      <section aria-label="Platform totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {kpis.map((kpi) => (
-          <ConsoleKpiCard key={kpi.label} label={kpi.label} value={kpi.value} trend={kpi.trend} accent={kpi.accent} />
+          <AdminKpiCard
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            icon={kpi.icon}
+            tone={kpi.tone}
+            href={kpi.href}
+            delta={kpi.delta}
+            sparkline={kpi.sparkline}
+          />
         ))}
       </section>
 
-      {charts.map((chart) => (
-        <ConsoleAreaChart key={chart.title} title={chart.title} unit={chart.unit} series={{ [`Past ${WINDOW_DAYS} days`]: chart.points }} />
-      ))}
+      <section className="grid gap-4 xl:grid-cols-3">
+        <ConsoleChartCard
+          className="xl:col-span-2"
+          title="Platform activity"
+          subtitle={`Daily totals over the last ${days} days`}
+          unit="records"
+          kind="area"
+          series={{
+            'New signups': { points: signupSeries, unit: 'users' },
+            Reservations: { points: reservationSeries, unit: 'bookings' },
+            'Tickets sold': { points: ticketSeries, unit: 'tickets' },
+            Revenue: { points: revenueSeries, unit: 'ETB' },
+          }}
+        />
 
-      <p className="px-1 text-xs text-app-muted">
-        Aggregates are computed from up to 5,000 recent rows per series — swap to an aggregate RPC when volumes outgrow this.
+        <ConsoleDonutChart
+          title="Accounts by role"
+          subtitle="All profiles, up to 5,000 sampled"
+          unit="accounts"
+          data={roleMix}
+        />
+      </section>
+
+      <p className="px-1 text-xs text-console-muted">
+        Aggregates are computed from up to 5,000 recent rows per series — swap to an aggregate RPC
+        when volumes outgrow this.
       </p>
     </ConsolePageShell>
   )

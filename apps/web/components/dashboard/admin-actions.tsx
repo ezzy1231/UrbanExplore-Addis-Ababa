@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 import {
   adminCancelReservation,
   adminModerateEvent,
@@ -11,27 +12,30 @@ import {
   adminVerifyOrganizer,
   setBusinessVerification,
 } from '@/app/dashboard/actions'
+import { toast } from './console-toast'
 
 /**
  * Client controls for the admin panel's inline mutations. Each wraps a guarded
- * server action with useTransition and refreshes the relevant dashboard data.
+ * server action with useTransition, reports the outcome as a toast, then
+ * refreshes the relevant server-rendered data.
+ *
+ * The success string returned by every action used to be discarded; it is now
+ * the toast title so a decision is never silent.
  */
 
-function ActionError({ message }: { message: string | null }) {
-  if (!message) return null
-  return <span role="alert" className="max-w-[360px] text-xs text-danger">{message}</span>
-}
-
-function ActionSuccess({ message }: { message: string | null }) {
-  if (!message) return null
-  return <span role="status" className="text-[10px] text-success">{message}</span>
-}
-
 const pill =
-  'min-h-11 rounded-full border px-3.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50'
+  'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50'
 const pillOk = `${pill} border-success/40 bg-success/15 text-success hover:bg-success/25`
 const pillBad = `${pill} border-danger/40 bg-danger/15 text-danger hover:bg-danger/25`
-const pillNeutral = `${pill} border-app-border bg-transparent text-app-muted hover:border-ember/30`
+const pillNeutral = `${pill} border-console-border bg-console-card text-console-muted hover:border-console-indigo/30 hover:text-console-ink`
+
+function Busy() {
+  return <Loader2 aria-hidden="true" className="size-3.5 animate-spin" strokeWidth={2.4} />
+}
+
+function reportFailure(message: string, fallback = 'Please try again.') {
+  toast.error('Action failed', message || fallback)
+}
 
 export function BusinessLifecycleActions({
   businessId,
@@ -41,20 +45,16 @@ export function BusinessLifecycleActions({
   status: string
 }) {
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   function run(approve: boolean) {
-    setError(null)
-    setSuccess(null)
     if (!approve && !window.confirm('Reject this business verification request?')) return
     startTransition(async () => {
       const result = await setBusinessVerification(businessId, approve)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
       // A full navigation forces the server-rendered business list/detail to
       // read its current status from Supabase after moderation.
       window.location.reload()
@@ -63,20 +63,21 @@ export function BusinessLifecycleActions({
 
   return (
     <div className="flex items-center gap-2">
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
       {status === 'pending' && (
         <button type="button" disabled={pending} onClick={() => run(true)} className={pillOk}>
-          Verify
+          {pending && <Busy />}
+          {pending ? 'Verifying…' : 'Verify'}
         </button>
       )}
       {status === 'rejected' && (
         <button type="button" disabled={pending} onClick={() => run(true)} className={pillOk}>
-          Approve &amp; activate
+          {pending && <Busy />}
+          {pending ? 'Approving…' : 'Approve & activate'}
         </button>
       )}
       {(status === 'active' || status === 'pending') && (
         <button type="button" disabled={pending} onClick={() => run(false)} className={pillBad}>
+          {pending && <Busy />}
           Reject
         </button>
       )}
@@ -93,32 +94,27 @@ export function OrganizerVerificationActions({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   function act(approve: boolean) {
-    setError(null)
-    setSuccess(null)
     if (!approve && !window.confirm('Reject this organizer verification?')) return
     startTransition(async () => {
       const result = await adminVerifyOrganizer(organizerId, approve)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
       router.refresh()
     })
   }
 
   return (
     <div className="flex items-center gap-2">
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
       {(status === 'pending' || status === 'rejected') && (
         <>
           <button type="button" disabled={pending} onClick={() => act(true)} className={pillOk}>
-            Verify
+            {pending && <Busy />}
+            {pending ? 'Verifying…' : 'Verify'}
           </button>
           <button type="button" disabled={pending} onClick={() => act(false)} className={pillBad}>
             Reject
@@ -132,20 +128,16 @@ export function OrganizerVerificationActions({
 export function UserRoleSelect({ userId, currentRole }: { userId: string; currentRole: string }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   function change(next: string) {
     if (next === currentRole) return
-    setError(null)
-    setSuccess(null)
     startTransition(async () => {
       const result = await adminSetUserRole(userId, next)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
       router.refresh()
     })
   }
@@ -155,17 +147,16 @@ export function UserRoleSelect({ userId, currentRole }: { userId: string; curren
       <select
         value={currentRole}
         disabled={pending}
-        onChange={(e) => change(e.target.value)}
+        onChange={(event) => change(event.target.value)}
         aria-label="User role"
-        className="rounded-md border border-app-border bg-app-bg px-2 py-1.5 text-xs text-app-fg outline-none transition-colors focus:border-ember/50 disabled:opacity-50"
+        className="rounded-lg border border-console-border bg-console-card px-2 py-1.5 text-xs text-console-ink outline-none transition-colors focus:border-console-indigo/50 disabled:opacity-50"
       >
         <option value="customer">customer</option>
         <option value="food_business">food_business</option>
         <option value="event_organizer">event_organizer</option>
         <option value="system_admin">system_admin</option>
       </select>
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
+      {pending && <Busy />}
     </span>
   )
 }
@@ -179,36 +170,32 @@ export function EventModerationActions({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   function act(action: 'publish' | 'unpublish' | 'cancel') {
-    setError(null)
-    setSuccess(null)
     if (action === 'cancel' && !window.confirm('Cancel this event?')) return
     startTransition(async () => {
       const result = await adminModerateEvent(eventId, action)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
       router.refresh()
     })
   }
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
       {(status === 'draft' || status === 'cancelled') && (
         <button type="button" disabled={pending} onClick={() => act('publish')} className={pillOk}>
-          Publish
+          {pending && <Busy />}
+          {pending ? 'Publishing…' : 'Publish'}
         </button>
       )}
       {status === 'published' && (
         <button type="button" disabled={pending} onClick={() => act('unpublish')} className={pillNeutral}>
-          Unpublish
+          {pending && <Busy />}
+          {pending ? 'Unpublishing…' : 'Unpublish'}
         </button>
       )}
       {(status === 'published' || status === 'draft') && (
@@ -229,35 +216,29 @@ export function ReservationCancelAction({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
 
   function cancel() {
-    setError(null)
-    setSuccess(null)
     if (!window.confirm('Cancel this reservation?')) return
     startTransition(async () => {
       const result = await adminCancelReservation(reservationId)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
+      setDone(true)
       router.refresh()
     })
   }
 
-  if (success) return <span role="status" className="text-xs font-medium text-success">{success}</span>
-  if (status !== 'pending' && status !== 'confirmed') return null
+  if (done || (status !== 'pending' && status !== 'confirmed')) return null
 
   return (
-    <span className="flex items-center gap-2">
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
-      <button type="button" disabled={pending} onClick={cancel} className={pillBad}>
-        Cancel booking
-      </button>
-    </span>
+    <button type="button" disabled={pending} onClick={cancel} className={pillBad}>
+      {pending && <Busy />}
+      {pending ? 'Cancelling…' : 'Cancel booking'}
+    </button>
   )
 }
 
@@ -270,37 +251,26 @@ export function UserSuspensionActions({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   function toggle() {
-    setError(null)
-    setSuccess(null)
     if (!isSuspended && !window.confirm('Suspend this user?')) return
     startTransition(async () => {
       const result = await adminSetUserSuspended(userId, !isSuspended)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
       router.refresh()
     })
   }
 
   return (
     <span className="inline-flex items-center gap-2">
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
-      {isSuspended ? (
-        <button type="button" disabled={pending} onClick={toggle} className={pillOk}>
-          Reinstate
-        </button>
-      ) : (
-        <button type="button" disabled={pending} onClick={toggle} className={pillBad}>
-          Suspend
-        </button>
-      )}
+      <button type="button" disabled={pending} onClick={toggle} className={isSuspended ? pillOk : pillBad}>
+        {pending && <Busy />}
+        {isSuspended ? (pending ? 'Reinstating…' : 'Reinstate') : pending ? 'Suspending…' : 'Suspend'}
+      </button>
     </span>
   )
 }
@@ -313,41 +283,30 @@ export function BusinessSuspendAction({
   status: string
 }) {
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // moderation_status has no 'suspended'; suspension maps to 'inactive'.
   const suspended = status === 'inactive'
   if (status === 'pending' || status === 'rejected') return null
 
   function toggle() {
-    setError(null)
-    setSuccess(null)
     if (!suspended && !window.confirm('Suspend this business?')) return
     startTransition(async () => {
       const result = await adminSetBusinessActive(businessId, suspended)
       if (!result.ok) {
-        setError(result.message)
+        reportFailure(result.message)
         return
       }
-      setSuccess(result.message)
+      toast.success(result.message)
       window.location.reload()
     })
   }
 
   return (
     <span className="inline-flex items-center gap-2">
-      <ActionError message={error} />
-      <ActionSuccess message={success} />
-      {suspended ? (
-        <button type="button" disabled={pending} onClick={toggle} className={pillOk}>
-          Reactivate
-        </button>
-      ) : (
-        <button type="button" disabled={pending} onClick={toggle} className={pillNeutral}>
-          Suspend
-        </button>
-      )}
+      <button type="button" disabled={pending} onClick={toggle} className={suspended ? pillOk : pillNeutral}>
+        {pending && <Busy />}
+        {suspended ? (pending ? 'Reactivating…' : 'Reactivate') : pending ? 'Suspending…' : 'Suspend'}
+      </button>
     </span>
   )
 }

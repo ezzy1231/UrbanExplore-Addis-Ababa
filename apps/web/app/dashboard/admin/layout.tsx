@@ -2,18 +2,19 @@ import { redirect } from 'next/navigation'
 import { ConsoleShell } from '@/components/dashboard/console-shell'
 import { createClient } from '@/lib/supabase/server'
 import { getUnreadNotificationCount } from '@/lib/supabase/queries'
+import type { ConsoleNavItem } from '@/components/dashboard/console-shell'
 
-const navItems = [
-  { label: 'Overview', href: '/dashboard/admin' },
-  { label: 'Users', href: '/dashboard/admin/users' },
-  { label: 'Verification', href: '/dashboard/admin/verification' },
-  { label: 'Businesses', href: '/dashboard/admin/businesses' },
-  { label: 'Organizers', href: '/dashboard/admin/organizers' },
-  { label: 'Events', href: '/dashboard/admin/events' },
-  { label: 'Reservations', href: '/dashboard/admin/reservations' },
-  { label: 'Audit Log', href: '/dashboard/admin/audit' },
-  { label: 'Metrics', href: '/dashboard/admin/metrics' },
-  { label: 'Settings', href: '/dashboard/admin/settings' },
+const NAV_ITEMS: ConsoleNavItem[] = [
+  { label: 'Overview', href: '/dashboard/admin', section: 'Operations' },
+  { label: 'Metrics', href: '/dashboard/admin/metrics', section: 'Operations' },
+  { label: 'Verification', href: '/dashboard/admin/verification', section: 'Moderation' },
+  { label: 'Businesses', href: '/dashboard/admin/businesses', section: 'Moderation' },
+  { label: 'Organizers', href: '/dashboard/admin/organizers', section: 'Moderation' },
+  { label: 'Events', href: '/dashboard/admin/events', section: 'Moderation' },
+  { label: 'Reservations', href: '/dashboard/admin/reservations', section: 'Moderation' },
+  { label: 'Users', href: '/dashboard/admin/users', section: 'Access' },
+  { label: 'Audit Log', href: '/dashboard/admin/audit', section: 'Access' },
+  { label: 'Settings', href: '/dashboard/admin/settings', section: 'Access' },
 ]
 
 export default async function AdminDashboardLayout({
@@ -34,7 +35,19 @@ export default async function AdminDashboardLayout({
 
   if ((profile?.role as string | undefined) !== 'system_admin') redirect('/auth/no-access')
 
-  const notificationCount = profile?.id ? await getUnreadNotificationCount(profile.id) : 0
+  const [notificationCount, verificationCountRes] = await Promise.all([
+    profile?.id ? getUnreadNotificationCount(profile.id) : Promise.resolve(0),
+    // Matches the verification queue's "open" scope (lib/dashboard/verification-data.ts).
+    supabase
+      .from('verification_requests')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['pending', 'in_review', 'needs_info']),
+  ])
+
+  const verificationCount = verificationCountRes.count ?? 0
+  const navItems = NAV_ITEMS.map((item) =>
+    item.label === 'Verification' ? { ...item, badge: verificationCount } : item,
+  )
 
   return (
     <ConsoleShell
@@ -44,6 +57,7 @@ export default async function AdminDashboardLayout({
       showPromo={false}
       homeHref="/dashboard/admin"
       settingsHref="/dashboard/admin/settings"
+      search={{ action: '/dashboard/admin/users', placeholder: 'Search users…' }}
     >
       {children}
     </ConsoleShell>
